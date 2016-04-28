@@ -8,6 +8,12 @@ import sys
 import time
 import string
 
+############################
+from flask import Flask
+from flask_restful import Api, Resource
+############################
+
+
 
 from threading import Thread
 
@@ -22,6 +28,7 @@ def GetMACAddress():
 	myMAC = open('/sys/class/net/wlan0/address').read()
 	return myMAC[0:17]
 
+idDevice = GetMACAddress()
 
 def interruptHandler(signal, frame):
     sys.exit(0)
@@ -34,7 +41,7 @@ def dataNetwork():
     return netdata.packets_sent + netdata.packets_recv
 
 def dataNetworkHandler():
-    idDevice = GetMACAddress()
+
     mqttclient = paho.Client()
     mqttclient.on_publish = on_publish
     mqttclient.connect("test.mosquitto.org", 1883, 60)
@@ -42,26 +49,27 @@ def dataNetworkHandler():
         packets = dataNetwork()
         message = idDevice + " " + str(packets)
         print "MQTT dataNetworkHandler " + message
-        mqttclient.publish("IoT101/Network", message)
-        time.sleep(1)
+        mqttclient.publish("IoT101/" + idDevice + "/Network", message)
+        time.sleep(10)
 
 def on_message(mosq, obj, msg):
     print "MQTT dataMessageHandler %s %s" % (msg.topic, msg.payload)
+
 
 def dataMessageHandler():
     mqttclient = paho.Client()
     mqttclient.on_message = on_message
     mqttclient.connect("test.mosquitto.org", 1883, 60)
-    mqttclient.subscribe("IoT101/Message", 0)
+    mqttclient.subscribe("IoT101/" + idDevice + "/Message", 0)
     while mqttclient.loop() == 0:
         pass
 
-def dataWeatherHandler():
-    weather = pywapi.get_weather_from_yahoo('MXJO0043', 'metric')
-    message = "Weather report in " + weather['location']['city']
-    message = message + ", Temperature " + weather['condition']['temp'] + " C"
-    message = message + ", Atmospheric Pressure " + weather['atmosphere']['pressure'] + " mbar"
-    print message
+#def dataWeatherHandler():
+#    weather = pywapi.get_weather_from_yahoo('MXJO0043', 'metric')
+#    message = "Weather report in " + weather['location']['city']
+#    message = message + ", Temperature " + weather['condition']['temp'] + " C"
+#    message = message + ", Atmospheric Pressure " + weather['atmosphere']['pressure'] + " mbar"
+#    print message
 
 def dataPlotly():
     return dataNetwork()
@@ -97,9 +105,27 @@ def dataPlotlyHandler():
         i += 1
         time.sleep(0.25)
 
+################################
+
+app = Flask(__name__)
+api = Api(app)
+
+class Network(Resource):
+    def get(self):
+        data = dataNetwork()
+        return data
+
+api.add_resource(Network, '/network')
+
+##################################
+
+
 if __name__ == '__main__':
 
+    app.run(host='0.0.0.0', debug=True)
+
     signal.signal(signal.SIGINT, interruptHandler)
+    
 
     threadx = Thread(target=dataNetworkHandler)
     threadx.start()
@@ -109,10 +135,13 @@ if __name__ == '__main__':
 
     threadz = Thread(target=dataPlotlyHandler)
     threadz.start()
+    
 
-    while True:
-        print "Hello Internet of Things 101"
-        dataWeatherHandler()
-        time.sleep(5)
+
+
+#    while True:
+#        print "Hello Internet of Things 101"
+#        dataWeatherHandler()
+#        time.sleep(5)
 
 # End of File
