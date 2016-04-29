@@ -7,6 +7,9 @@ import signal
 import sys
 import time
 import string
+import dweepy
+
+
 
 ############################
 from flask import Flask
@@ -50,7 +53,7 @@ def dataNetworkHandler():
         message = idDevice + " " + str(packets)
         print "MQTT dataNetworkHandler " + message
         mqttclient.publish("IoT101/" + idDevice + "/Network", message)
-        time.sleep(10)
+        time.sleep(1)
 
 def on_message(mosq, obj, msg):
     print "MQTT dataMessageHandler %s %s" % (msg.topic, msg.payload)
@@ -64,12 +67,13 @@ def dataMessageHandler():
     while mqttclient.loop() == 0:
         pass
 
-#def dataWeatherHandler():
-#    weather = pywapi.get_weather_from_yahoo('MXJO0043', 'metric')
-#    message = "Weather report in " + weather['location']['city']
-#    message = message + ", Temperature " + weather['condition']['temp'] + " C"
-#    message = message + ", Atmospheric Pressure " + weather['atmosphere']['pressure'] + " mbar"
-#    print message
+def dataWeatherHandler():
+    weather = pywapi.get_weather_from_weather_com('MXJO0043', 'metric')
+    message = "Weather Report in " + weather['location']['name']
+    message = message + ", Temperature " + weather['current_conditions']['temperature'] + " C"
+    message = message + ", Atmospheric Pressure " + weather['current_conditions']['barometer']['reading'][:-3] + " mbar"
+    print message
+
 
 def dataPlotly():
     return dataNetwork()
@@ -118,14 +122,16 @@ class Network(Resource):
 api.add_resource(Network, '/network')
 
 ##################################
+	
 
 
 if __name__ == '__main__':
 
+    
+	
     app.run(host='0.0.0.0', debug=True)
 
     signal.signal(signal.SIGINT, interruptHandler)
-    
 
     threadx = Thread(target=dataNetworkHandler)
     threadx.start()
@@ -136,12 +142,14 @@ if __name__ == '__main__':
     threadz = Thread(target=dataPlotlyHandler)
     threadz.start()
     
+    dataWeatherHandler()
+        
 
-
-
-#    while True:
-#        print "Hello Internet of Things 101"
-#        dataWeatherHandler()
-#        time.sleep(5)
+    while True:
+        
+        json= {'network':dataNetwork()}
+        dweepy.dweet_for('meraz1990', json)
+        print "Hello Internet of Things 101"
+        time.sleep(5)
 
 # End of File
