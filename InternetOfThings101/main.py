@@ -8,7 +8,8 @@ import sys
 import time
 import string
 import dweepy
-
+import pyupm_grove as grove
+relay = grove.GroveRelay(3)
 
 
 ############################
@@ -32,6 +33,7 @@ def GetMACAddress():
 	return myMAC[0:17]
 
 idDevice = GetMACAddress()
+
 
 def interruptHandler(signal, frame):
     sys.exit(0)
@@ -66,6 +68,25 @@ def dataMessageHandler():
     mqttclient.subscribe("IoT101/" + idDevice + "/Message", 0)
     while mqttclient.loop() == 0:
         pass
+
+
+def on_actuador(mosq, obj, msg):
+    relay.on()
+    time.sleep(5)
+    relay.off()
+    print "MQTT dataActuadorHandler %s %s" % (msg.topic, msg.payload)
+
+
+def dataActuadorHandler():
+    mqttclient = paho.Client()
+    mqttclient.on_message = on_actuador
+    mqttclient.connect("test.mosquitto.org", 1883, 60)
+    mqttclient.subscribe("IoT101/" + idDevice + "/actuador", 0)
+    while mqttclient.loop() == 0:
+        pass
+
+
+
 
 def dataWeatherHandler():
     weather = pywapi.get_weather_from_weather_com('MXJO0043', 'metric')
@@ -143,13 +164,13 @@ if __name__ == '__main__':
     threadz.start()
     
     dataWeatherHandler()
-        
+    dataActuadorHandler()        
 
     while True:
         
         json= {'network':dataNetwork()}
         dweepy.dweet_for('meraz1990', json)
         print "Hello Internet of Things 101"
-        time.sleep(5)
+	time.sleep(5)
 
 # End of File
